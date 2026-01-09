@@ -39,7 +39,7 @@ let progressChart = null;
 let pages, navBtns, authBtn, authModal, closeModal, loginForm, signupForm, showSignup, showLogin;
 let loginBtn, signupBtn, authError, generateWodBtn, wodResult, wodContent, saveWodBtn;
 let exerciseSelect, metricSelect, historyList, historySearch, historySort;
-let addExerciseBtn, exercisesList, saveWorkoutBtn, clearWorkoutBtn, cancelEditBtn, workoutNameInput, workoutDateInput;
+let addExerciseBtn, exercisesList, saveWorkoutBtn, clearWorkoutBtn, cancelEditBtn, workoutNameInput, workoutDateInput, workoutNotesInput;
 
 // WOD Exercises Database
 const wodExercises = {
@@ -184,6 +184,7 @@ function initWorkoutTracker() {
     cancelEditBtn = document.getElementById('cancel-edit-btn');
     workoutNameInput = document.getElementById('workout-name');
     workoutDateInput = document.getElementById('workout-date');
+    workoutNotesInput = document.getElementById('workout-notes');
     
     setupEventListeners();
     checkAuthState();
@@ -399,7 +400,7 @@ function generateWOD() {
         
         if (!wodExercises[equipment] || !wodExercises[equipment][difficulty]) {
             console.error('Invalid equipment or difficulty selection');
-            alert('Error generating WOD. Please try again.');
+            showToast('Error generating WOD. Please try again.', 'error');
             return;
         }
         
@@ -407,7 +408,7 @@ function generateWOD() {
         
         if (!exercisePool || exercisePool.length === 0) {
             console.error('No exercises available for this selection');
-            alert('No exercises available. Please try a different selection.');
+            showToast('No exercises available. Please try a different selection.', 'warning');
             return;
         }
         
@@ -430,7 +431,7 @@ function generateWOD() {
         }
 
         if (selectedExercises.length === 0) {
-            alert('Error generating WOD. Please try again.');
+            showToast('Error generating WOD. Please try again.', 'error');
             return;
         }
 
@@ -459,7 +460,7 @@ function generateWOD() {
         };
     } catch (error) {
         console.error('Error generating WOD:', error);
-        alert('Error generating WOD: ' + error.message);
+        showToast('Error generating WOD: ' + error.message, 'error');
     }
 }
 
@@ -535,6 +536,7 @@ function clearWorkoutForm() {
     if (workoutDateInput) {
         workoutDateInput.value = formatDateForInput(new Date());
     }
+    if (workoutNotesInput) workoutNotesInput.value = '';
     exerciseCounter = 0;
     delete window.editingWorkoutId;
     if (saveWorkoutBtn) saveWorkoutBtn.textContent = 'Save Workout';
@@ -546,19 +548,78 @@ function cancelEdit() {
     navigateTo('history');
 }
 
+// Toast Notification System
+function showToast(message, type = 'info', title = null, duration = 4000) {
+    const container = document.getElementById('toast-container');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = `toast ${type}`;
+
+    const icons = {
+        success: '✅',
+        error: '❌',
+        warning: '⚠️',
+        info: 'ℹ️'
+    };
+
+    const titles = {
+        success: title || 'Success',
+        error: title || 'Error',
+        warning: title || 'Warning',
+        info: title || 'Info'
+    };
+
+    toast.innerHTML = `
+        <span class="toast-icon">${icons[type] || icons.info}</span>
+        <div class="toast-content">
+            <div class="toast-title">${titles[type]}</div>
+            <div class="toast-message">${message}</div>
+        </div>
+        <button class="toast-close" onclick="this.parentElement.remove()">×</button>
+    `;
+
+    container.appendChild(toast);
+
+    // Auto remove after duration
+    setTimeout(() => {
+        if (toast.parentElement) {
+            toast.style.animation = 'slideOutRight 0.3s ease-out';
+            setTimeout(() => toast.remove(), 300);
+        }
+    }, duration);
+
+    return toast;
+}
+
+// Loading Overlay Functions
+function showLoading(text = 'Loading...') {
+    const overlay = document.getElementById('loading-overlay');
+    const loadingText = overlay?.querySelector('.loading-text');
+    if (overlay) {
+        overlay.classList.remove('hidden');
+        if (loadingText) loadingText.textContent = text;
+    }
+}
+
+function hideLoading() {
+    const overlay = document.getElementById('loading-overlay');
+    if (overlay) overlay.classList.add('hidden');
+}
+
 async function saveManualWorkout() {
     if (!db) {
-        alert('Firebase is not configured. Please set up your Firebase config to save workouts.');
+        showToast('Firebase is not configured. Please set up your Firebase config to save workouts.', 'error');
         return;
     }
     if (!currentUser) {
-        alert('Please login to save workouts');
+        showToast('Please login to save workouts', 'warning');
         return;
     }
 
     const exerciseItems = exercisesList.querySelectorAll('.exercise-item');
     if (exerciseItems.length === 0) {
-        alert('Please add at least one exercise');
+        showToast('Please add at least one exercise', 'warning');
         return;
     }
 
@@ -586,45 +647,50 @@ async function saveManualWorkout() {
     });
 
     if (exercises.length === 0) {
-        alert('Please fill in all required fields for at least one exercise');
+        showToast('Please fill in all required fields for at least one exercise', 'warning');
         return;
     }
 
     const workoutName = workoutNameInput.value.trim() || 'Custom Workout';
     const workoutDate = parseDateFromInput(workoutDateInput.value);
+    const workoutNotes = workoutNotesInput ? workoutNotesInput.value.trim() : '';
 
     try {
+        showLoading('Saving workout...');
         const workoutData = {
             type: workoutName,
             userId: currentUser.uid,
             timestamp: Timestamp.fromDate(workoutDate),
             exercises: exercises,
-            totalVolume: totalVolume
+            totalVolume: totalVolume,
+            notes: workoutNotes || null
         };
 
         if (window.editingWorkoutId) {
             // Update existing workout
             await updateDoc(doc(db, 'workouts', window.editingWorkoutId), workoutData);
-            alert('Workout updated successfully!');
+            showToast('Workout updated successfully!', 'success');
         } else {
             // Create new workout
             await addDoc(collection(db, 'workouts'), workoutData);
-            alert('Workout saved successfully!');
+            showToast('Workout saved successfully!', 'success');
         }
         
         clearWorkoutForm();
         await loadWorkouts();
+        hideLoading();
         navigateTo('history');
     } catch (error) {
         console.error('Error saving workout:', error);
-        alert('Error saving workout. Please try again.');
+        hideLoading();
+        showToast('Error saving workout. Please try again.', 'error');
     }
 }
 
 // Delete workout function
 async function deleteWorkout(workoutId) {
     if (!db || !currentUser) {
-        alert('Not authenticated. Please log in.');
+        showToast('Not authenticated. Please log in.', 'warning');
         return;
     }
     
@@ -633,13 +699,16 @@ async function deleteWorkout(workoutId) {
     }
     
     try {
+        showLoading('Deleting workout...');
         await deleteDoc(doc(db, 'workouts', workoutId));
         await loadWorkouts();
         renderHistory();
-        alert('Workout deleted successfully!');
+        hideLoading();
+        showToast('Workout deleted successfully!', 'success');
     } catch (error) {
         console.error('Error deleting workout:', error);
-        alert('Error deleting workout. Please try again.');
+        hideLoading();
+        showToast('Error deleting workout. Please try again.', 'error');
     }
 }
 
@@ -664,7 +733,7 @@ function toggleWorkoutDetails(workoutId) {
 async function editWorkout(workoutId) {
     const workout = workouts.find(w => w.id === workoutId);
     if (!workout) {
-        alert('Workout not found');
+        showToast('Workout not found', 'error');
         return;
     }
 
@@ -678,6 +747,10 @@ async function editWorkout(workoutId) {
         // Convert Firestore timestamp to Date if needed
         const dateObj = workout.timestamp instanceof Date ? workout.timestamp : workout.timestamp.toDate();
         workoutDateInput.value = formatDateForInput(dateObj);
+    }
+    
+    if (workoutNotesInput) {
+        workoutNotesInput.value = workout.notes || '';
     }
     
     // Clear existing exercises
@@ -760,20 +833,21 @@ function calculateExerciseVolume(exercise) {
 
 async function saveGeneratedWOD() {
     if (!db) {
-        alert('Firebase is not configured. Please set up your Firebase config to save workouts.');
+        showToast('Firebase is not configured. Please set up your Firebase config to save workouts.', 'error');
         return;
     }
     if (!currentUser) {
-        alert('Please login to save workouts');
+        showToast('Please login to save workouts', 'warning');
         return;
     }
 
     if (!window.currentGeneratedWOD) {
-        alert('No workout to save');
+        showToast('No workout to save', 'warning');
         return;
     }
 
     try {
+        showLoading('Saving workout...');
         const exercises = window.currentGeneratedWOD.exercises.map(ex => ({
             name: ex.name,
             sets: parseInt(ex.sets),
@@ -793,12 +867,14 @@ async function saveGeneratedWOD() {
         };
 
         await addDoc(collection(db, 'workouts'), workoutData);
-        alert('Workout saved!');
+        showToast('Workout saved!', 'success');
         await loadWorkouts();
+        hideLoading();
         navigateTo('history');
     } catch (error) {
         console.error('Error saving workout:', error);
-        alert('Error saving workout. Please try again.');
+        hideLoading();
+        showToast('Error saving workout. Please try again.', 'error');
     }
 }
 
@@ -810,6 +886,7 @@ async function loadWorkouts() {
     }
 
     try {
+        showLoading('Loading workouts...');
         const workoutsQuery = query(
             collection(db, 'workouts'),
             where('userId', '==', currentUser.uid),
@@ -827,6 +904,7 @@ async function loadWorkouts() {
         
         updateExerciseSelect();
         updateDashboard();
+        hideLoading();
     } catch (error) {
         console.error('Error loading workouts:', error);
         // If error is about missing index, try querying without orderBy first
@@ -848,12 +926,15 @@ async function loadWorkouts() {
                 }).sort((a, b) => b.timestamp - a.timestamp);
                 updateExerciseSelect();
                 updateDashboard();
+                hideLoading();
             } catch (fallbackError) {
                 console.error('Fallback query also failed:', fallbackError);
                 workouts = [];
+                hideLoading();
             }
         } else {
             workouts = [];
+            hideLoading();
         }
     }
 }
@@ -1050,7 +1131,10 @@ function renderHistory() {
     let filteredWorkouts = workouts.filter(workout => {
         if (!searchTerm) return true;
         const exerciseNames = workout.exercises?.map(ex => ex.name.toLowerCase()).join(' ') || '';
-        return exerciseNames.includes(searchTerm) || workout.type?.toLowerCase().includes(searchTerm);
+        const notes = workout.notes?.toLowerCase() || '';
+        return exerciseNames.includes(searchTerm) || 
+               workout.type?.toLowerCase().includes(searchTerm) ||
+               notes.includes(searchTerm);
     });
 
     if (sortOrder === 'oldest') {
@@ -1144,6 +1228,12 @@ function renderHistory() {
                         </div>
                     `).join('') || '<p>No exercises found</p>'}
                 </div>
+                ${workout.notes ? `
+                <div class="workout-notes">
+                    <h4 class="notes-header">Notes</h4>
+                    <p class="notes-content">${workout.notes.replace(/\n/g, '<br>')}</p>
+                </div>
+                ` : ''}
             </div>
         `;
         historyList.appendChild(item);
