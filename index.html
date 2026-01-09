@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="description" content="Track your workouts, generate WODs, and monitor your fitness progress">
+    <meta name="theme-color" content="#6366f1">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Workout Tracker">
+    <title>Workout Tracker</title>
+    <link rel="stylesheet" href="/styles.css">
+    <link rel="icon" type="image/png" href="/icon.png">
+    <link rel="apple-touch-icon" href="/icon.png">
+    <link rel="manifest" href="/manifest.json">
+</head>
+<body>
+    <div id="app">
+        <!-- Navigation -->
+        <nav class="navbar">
+            <div class="nav-container">
+                <div class="logo">
+                    <img src="/icon.png" alt="Workout Tracker" class="logo-icon">
+                    <h1>Workout Tracker</h1>
+                </div>
+                <div class="nav-links">
+                    <button class="nav-btn" data-page="dashboard">Dashboard</button>
+                    <button class="nav-btn" data-page="log">Log Workout</button>
+                    <button class="nav-btn" data-page="wod">WOD Generator</button>
+                    <button class="nav-btn" data-page="progress">Progress</button>
+                    <button class="nav-btn" data-page="history">History</button>
+                    <button id="auth-btn" class="auth-btn">Login</button>
+                </div>
+            </div>
+        </nav>
+
+        <!-- Auth Modal -->
+        <div id="auth-modal" class="modal hidden">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <div id="auth-container">
+                    <h2>Login / Sign Up</h2>
+                    <div id="auth-forms">
+                        <!-- Login Form -->
+                        <div id="login-form">
+                            <input type="email" id="login-email" placeholder="Email" required>
+                            <input type="password" id="login-password" placeholder="Password" required>
+                            <button id="login-btn" class="btn btn-primary">Login</button>
+                            <p>Don't have an account? <a href="#" id="show-signup">Sign up</a></p>
+                        </div>
+                        <!-- Signup Form -->
+                        <div id="signup-form" class="hidden">
+                            <input type="email" id="signup-email" placeholder="Email" required>
+                            <input type="password" id="signup-password" placeholder="Password" required>
+                            <button id="signup-btn" class="btn btn-primary">Sign Up</button>
+                            <p>Already have an account? <a href="#" id="show-login">Login</a></p>
+                        </div>
+                    </div>
+                    <div id="auth-error" class="error-message hidden"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Dashboard Page -->
+        <div id="dashboard-page" class="page active">
+            <div class="container">
+                <h2>Dashboard</h2>
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <h3>Total Workouts</h3>
+                        <p class="stat-number" id="total-workouts">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>This Week</h3>
+                        <p class="stat-number" id="week-workouts">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Volume (lbs)</h3>
+                        <p class="stat-number" id="total-volume">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Favorite Exercise</h3>
+                        <p class="stat-number" id="favorite-exercise">-</p>
+                    </div>
+                </div>
+                <div class="quick-actions">
+                    <button class="btn btn-primary" data-page="wod">Generate WOD</button>
+                    <button class="btn btn-secondary" data-page="history">View History</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Log Workout Page -->
+        <div id="log-page" class="page">
+            <div class="container">
+                <h2>Log Workout</h2>
+                <div class="workout-form-container">
+                    <div class="workout-form-header">
+                        <div class="control-group">
+                            <label>Workout Name/Type:</label>
+                            <input type="text" id="workout-name" placeholder="e.g., Upper Body, Leg Day, etc.">
+                        </div>
+                        <div class="control-group">
+                            <label>Date:</label>
+                            <input type="date" id="workout-date" value="">
+                        </div>
+                    </div>
+                    
+                    <div id="exercises-list" class="exercises-list">
+                        <!-- Exercises will be added here dynamically -->
+                    </div>
+                    
+                    <button id="add-exercise-btn" class="btn btn-secondary">+ Add Exercise</button>
+                    
+                    <div class="workout-form-actions">
+                        <button id="cancel-edit-btn" class="btn btn-secondary hidden">Cancel Edit</button>
+                        <div style="flex: 1;"></div>
+                        <button id="save-workout-btn" class="btn btn-primary">Save Workout</button>
+                        <button id="clear-workout-btn" class="btn btn-secondary">Clear</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- WOD Generator Page -->
+        <div id="wod-page" class="page">
+            <div class="container">
+                <h2>CrossFit WOD Generator</h2>
+                <div class="wod-controls">
+                    <div class="control-group">
+                        <label>Equipment:</label>
+                        <select id="equipment-select">
+                            <option value="none">No Equipment</option>
+                            <option value="barbell">Barbell</option>
+                            <option value="dumbbell">Dumbbell</option>
+                        </select>
+                    </div>
+                    <div class="control-group">
+                        <label>Difficulty:</label>
+                        <select id="difficulty-select">
+                            <option value="beginner">Beginner</option>
+                            <option value="intermediate">Intermediate</option>
+                            <option value="advanced">Advanced</option>
+                        </select>
+                    </div>
+                    <button id="generate-wod-btn" class="btn btn-primary">Generate WOD</button>
+                </div>
+                <div id="wod-result" class="wod-result hidden">
+                    <h3>Your Workout of the Day</h3>
+                    <div id="wod-content"></div>
+                    <button id="save-wod-btn" class="btn btn-secondary">Save Workout</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Page -->
+        <div id="progress-page" class="page">
+            <div class="container">
+                <h2>Progress Charts</h2>
+                <div class="chart-controls">
+                    <label>Exercise:</label>
+                    <select id="exercise-select">
+                        <option value="all">All Exercises</option>
+                    </select>
+                </div>
+                <div class="chart-container">
+                    <canvas id="progress-chart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- History Page -->
+        <div id="history-page" class="page">
+            <div class="container">
+                <h2>Workout History</h2>
+                <div class="history-controls">
+                    <input type="text" id="history-search" placeholder="Search workouts...">
+                    <select id="history-sort">
+                        <option value="newest">Newest First</option>
+                        <option value="oldest">Oldest First</option>
+                    </select>
+                </div>
+                <div id="history-list" class="history-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module" src="/main.js"></script>
+</body>
+</html>
