@@ -2148,13 +2148,18 @@ function updateMonthlyChart() {
     
     const monthlyData = {};
     workouts.forEach(workout => {
-        const monthKey = workout.timestamp.toISOString().substring(0, 7); // YYYY-MM
+        // Use local date, not UTC
+        const date = workout.timestamp;
+        const year = date.getFullYear();
+        const month = date.getMonth() + 1; // getMonth() returns 0-11
+        const monthKey = `${year}-${String(month).padStart(2, '0')}`; // YYYY-MM
         monthlyData[monthKey] = (monthlyData[monthKey] || 0) + 1;
     });
     
     const sortedMonths = Object.keys(monthlyData).sort();
     const labels = sortedMonths.map(m => {
-        const date = new Date(m + '-01');
+        const [year, month] = m.split('-');
+        const date = new Date(year, parseInt(month) - 1, 1); // month is 0-indexed
         return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
     });
     const data = sortedMonths.map(m => monthlyData[m]);
@@ -2200,15 +2205,22 @@ function updateVolumeChart() {
     
     const weeklyData = {};
     workouts.forEach(workout => {
+        // Use local date, not UTC
         const weekStart = new Date(workout.timestamp);
         weekStart.setDate(weekStart.getDate() - weekStart.getDay());
-        const weekKey = weekStart.toISOString().substring(0, 10);
+        weekStart.setHours(0, 0, 0, 0); // Start of day
+        // Create date key using local date components
+        const year = weekStart.getFullYear();
+        const month = String(weekStart.getMonth() + 1).padStart(2, '0');
+        const day = String(weekStart.getDate()).padStart(2, '0');
+        const weekKey = `${year}-${month}-${day}`;
         weeklyData[weekKey] = (weeklyData[weekKey] || 0) + (workout.totalVolume || 0);
     });
     
     const sortedWeeks = Object.keys(weeklyData).sort().slice(-12); // Last 12 weeks
     const labels = sortedWeeks.map(w => {
-        const date = new Date(w);
+        const [year, month, day] = w.split('-');
+        const date = new Date(year, parseInt(month) - 1, parseInt(day)); // month is 0-indexed
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
     });
     const data = sortedWeeks.map(w => weeklyData[w]);
