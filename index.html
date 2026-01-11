@@ -27,6 +27,8 @@
                     <button class="nav-btn" data-page="dashboard">Dashboard</button>
                     <button class="nav-btn" data-page="log">Log Workout</button>
                     <button class="nav-btn" data-page="wod">WOD Generator</button>
+                    <button class="nav-btn" data-page="templates">Templates</button>
+                    <button class="nav-btn" data-page="routines">Routines</button>
                     <button class="nav-btn" data-page="progress">Progress</button>
                     <button class="nav-btn" data-page="history">History</button>
                     <button id="auth-btn" class="auth-btn">Login</button>
@@ -64,7 +66,10 @@
         <!-- Dashboard Page -->
         <div id="dashboard-page" class="page active">
             <div class="container">
-                <h2>Dashboard</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem; flex-wrap: wrap; gap: 1rem;">
+                    <h2>Dashboard</h2>
+                    <button id="export-data-btn-dashboard" class="btn btn-secondary">Export Data</button>
+                </div>
                 <div class="stats-grid">
                     <div class="stat-card">
                         <h3>Total Workouts</h3>
@@ -82,10 +87,38 @@
                         <h3>Favorite Exercise</h3>
                         <p class="stat-number" id="favorite-exercise">-</p>
                     </div>
+                    <div class="stat-card">
+                        <h3>This Month</h3>
+                        <p class="stat-number" id="month-workouts">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Avg/Week</h3>
+                        <p class="stat-number" id="avg-week-workouts">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Total Exercises</h3>
+                        <p class="stat-number" id="total-exercises">0</p>
+                    </div>
+                    <div class="stat-card">
+                        <h3>Consistency</h3>
+                        <p class="stat-number" id="consistency-score">-</p>
+                    </div>
+                </div>
+                <div class="dashboard-charts">
+                    <div class="chart-card">
+                        <h3>Workouts Per Month</h3>
+                        <canvas id="monthly-chart"></canvas>
+                    </div>
+                    <div class="chart-card">
+                        <h3>Volume Over Time</h3>
+                        <canvas id="volume-chart"></canvas>
+                    </div>
                 </div>
                 <div class="quick-actions">
                     <button class="btn btn-primary" data-page="wod">Generate WOD</button>
                     <button class="btn btn-secondary" data-page="history">View History</button>
+                    <button class="btn btn-secondary" data-page="templates">Templates</button>
+                    <button class="btn btn-secondary" data-page="routines">Routines</button>
                 </div>
             </div>
         </div>
@@ -109,6 +142,14 @@
                     <div class="control-group">
                         <label>Notes (Optional):</label>
                         <textarea id="workout-notes" rows="3" placeholder="Add any notes about this workout, how you felt, etc."></textarea>
+                    </div>
+                    
+                    <div class="template-load-section" style="margin-bottom: 1rem; padding: 1rem; background: var(--bg-card); border-radius: 8px; border: 1px solid var(--border-color);">
+                        <label style="display: block; margin-bottom: 0.5rem; color: var(--text-secondary);">Load from Template (Optional):</label>
+                        <select id="load-template-select" style="width: 100%; padding: 0.75rem; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary);">
+                            <option value="">Select a template...</option>
+                        </select>
+                        <button id="load-template-btn" class="btn btn-secondary" style="margin-top: 0.5rem; width: 100%;">Load Template</button>
                     </div>
                     
                     <div id="exercises-list" class="exercises-list">
@@ -174,10 +215,35 @@
             </div>
         </div>
 
+        <!-- Templates Page -->
+        <div id="templates-page" class="page">
+            <div class="container">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                    <h2>Exercise Templates</h2>
+                    <button id="create-template-btn" class="btn btn-primary">+ Create Template</button>
+                </div>
+                <div id="templates-list" class="templates-list"></div>
+            </div>
+        </div>
+
+        <!-- Routines Page -->
+        <div id="routines-page" class="page">
+            <div class="container">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+                    <h2>Workout Routines</h2>
+                    <button id="create-routine-btn" class="btn btn-primary">+ Create Routine</button>
+                </div>
+                <div id="routines-list" class="routines-list"></div>
+            </div>
+        </div>
+
         <!-- History Page -->
         <div id="history-page" class="page">
             <div class="container">
-                <h2>Workout History</h2>
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h2>Workout History</h2>
+                    <button id="export-data-btn" class="btn btn-secondary">Export Data</button>
+                </div>
                 <div class="history-controls">
                     <input type="text" id="history-search" placeholder="Search workouts, exercises, notes...">
                     <select id="history-sort">
@@ -209,6 +275,53 @@
     <!-- Toast Notification Container -->
     <div id="toast-container" class="toast-container"></div>
     
+    <!-- Template Modal -->
+    <div id="template-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 800px;">
+            <span class="close-template">&times;</span>
+            <h2 id="template-modal-title">Create Template</h2>
+            <div class="template-form">
+                <div class="control-group">
+                    <label>Template Name:</label>
+                    <input type="text" id="template-name-input" placeholder="e.g., Push Day, Leg Day, etc.">
+                </div>
+                <div id="template-exercises-list" class="exercises-list"></div>
+                <button id="add-template-exercise-btn" class="btn btn-secondary">+ Add Exercise</button>
+                <div style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button id="cancel-template-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="save-template-btn" class="btn btn-primary">Save Template</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Routine Modal -->
+    <div id="routine-modal" class="modal hidden">
+        <div class="modal-content" style="max-width: 900px;">
+            <span class="close-routine">&times;</span>
+            <h2 id="routine-modal-title">Create Routine</h2>
+            <div class="routine-form">
+                <div class="control-group">
+                    <label>Routine Name:</label>
+                    <input type="text" id="routine-name-input" placeholder="e.g., 5-Day Split, Full Body 3x/Week">
+                </div>
+                <div class="control-group">
+                    <label>Description (Optional):</label>
+                    <textarea id="routine-description-input" rows="2" placeholder="Describe this routine..."></textarea>
+                </div>
+                <div id="routine-schedule">
+                    <h3 style="margin-bottom: 1rem; color: var(--text-primary);">Weekly Schedule</h3>
+                    <div id="routine-days-list"></div>
+                    <button id="add-routine-day-btn" class="btn btn-secondary" style="margin-top: 1rem;">+ Add Day</button>
+                </div>
+                <div style="margin-top: 1.5rem; display: flex; gap: 1rem; justify-content: flex-end;">
+                    <button id="cancel-routine-btn" class="btn btn-secondary">Cancel</button>
+                    <button id="save-routine-btn" class="btn btn-primary">Save Routine</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Loading Overlay -->
     <div id="loading-overlay" class="loading-overlay hidden">
         <div class="loading-spinner"></div>

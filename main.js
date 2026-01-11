@@ -33,7 +33,11 @@ try {
 // State
 let currentUser = null;
 let workouts = [];
+let templates = [];
+let routines = [];
 let progressChart = null;
+let monthlyChart = null;
+let volumeChart = null;
 
 // DOM Elements - will be initialized after DOM loads
 let pages, navBtns, authBtn, authModal, closeModal, loginForm, signupForm, showSignup, showLogin;
@@ -41,6 +45,9 @@ let loginBtn, signupBtn, authError, generateWodBtn, wodResult, wodContent, saveW
 let exerciseSelect, metricSelect, historyList, historySearch, historySort;
 let filterDateFrom, filterDateTo, filterExercise, clearFiltersBtn;
 let addExerciseBtn, exercisesList, saveWorkoutBtn, clearWorkoutBtn, cancelEditBtn, workoutNameInput, workoutDateInput, workoutNotesInput;
+let createTemplateBtn, templatesList, templateModal, closeTemplateModal, templateNameInput, templateExercisesList, addTemplateExerciseBtn, saveTemplateBtn, cancelTemplateBtn;
+let createRoutineBtn, routinesList, routineModal, closeRoutineModal, routineNameInput, routineDescriptionInput, routineDaysList, addRoutineDayBtn, saveRoutineBtn, cancelRoutineBtn;
+let loadTemplateSelect, loadTemplateBtn, exportDataBtn, exportDataBtnDashboard;
 
 // Exercise Library - Comprehensive list for autocomplete
 const exerciseLibrary = [
@@ -233,10 +240,35 @@ function initWorkoutTracker() {
     workoutNameInput = document.getElementById('workout-name');
     workoutDateInput = document.getElementById('workout-date');
     workoutNotesInput = document.getElementById('workout-notes');
+    createTemplateBtn = document.getElementById('create-template-btn');
+    templatesList = document.getElementById('templates-list');
+    templateModal = document.getElementById('template-modal');
+    closeTemplateModal = document.querySelector('.close-template');
+    templateNameInput = document.getElementById('template-name-input');
+    templateExercisesList = document.getElementById('template-exercises-list');
+    addTemplateExerciseBtn = document.getElementById('add-template-exercise-btn');
+    saveTemplateBtn = document.getElementById('save-template-btn');
+    cancelTemplateBtn = document.getElementById('cancel-template-btn');
+    createRoutineBtn = document.getElementById('create-routine-btn');
+    routinesList = document.getElementById('routines-list');
+    routineModal = document.getElementById('routine-modal');
+    closeRoutineModal = document.querySelector('.close-routine');
+    routineNameInput = document.getElementById('routine-name-input');
+    routineDescriptionInput = document.getElementById('routine-description-input');
+    routineDaysList = document.getElementById('routine-days-list');
+    addRoutineDayBtn = document.getElementById('add-routine-day-btn');
+    saveRoutineBtn = document.getElementById('save-routine-btn');
+    cancelRoutineBtn = document.getElementById('cancel-routine-btn');
+    loadTemplateSelect = document.getElementById('load-template-select');
+    loadTemplateBtn = document.getElementById('load-template-btn');
+    exportDataBtn = document.getElementById('export-data-btn');
+    exportDataBtnDashboard = document.getElementById('export-data-btn-dashboard');
     
     setupEventListeners();
     checkAuthState();
     loadWorkouts();
+    loadTemplates();
+    loadRoutines();
 }
 
 // Event Listeners
@@ -348,6 +380,61 @@ function setupEventListeners() {
     if (clearFiltersBtn) {
         clearFiltersBtn.addEventListener('click', clearFilters);
     }
+
+    // Templates
+    if (createTemplateBtn) {
+        createTemplateBtn.addEventListener('click', () => openTemplateModal());
+    }
+    if (closeTemplateModal) {
+        closeTemplateModal.addEventListener('click', () => closeTemplateModalFunc());
+    }
+    if (saveTemplateBtn) {
+        saveTemplateBtn.addEventListener('click', saveTemplate);
+    }
+    if (cancelTemplateBtn) {
+        cancelTemplateBtn.addEventListener('click', () => closeTemplateModalFunc());
+    }
+    if (addTemplateExerciseBtn) {
+        addTemplateExerciseBtn.addEventListener('click', addTemplateExerciseRow);
+    }
+    if (loadTemplateBtn) {
+        loadTemplateBtn.addEventListener('click', loadTemplateIntoWorkout);
+    }
+
+    // Routines
+    if (createRoutineBtn) {
+        createRoutineBtn.addEventListener('click', () => openRoutineModal());
+    }
+    if (closeRoutineModal) {
+        closeRoutineModal.addEventListener('click', () => closeRoutineModalFunc());
+    }
+    if (saveRoutineBtn) {
+        saveRoutineBtn.addEventListener('click', saveRoutine);
+    }
+    if (cancelRoutineBtn) {
+        cancelRoutineBtn.addEventListener('click', () => closeRoutineModalFunc());
+    }
+    if (addRoutineDayBtn) {
+        addRoutineDayBtn.addEventListener('click', addRoutineDay);
+    }
+
+    // Export
+    if (exportDataBtn) {
+        exportDataBtn.addEventListener('click', exportData);
+    }
+    if (exportDataBtnDashboard) {
+        exportDataBtnDashboard.addEventListener('click', exportData);
+    }
+
+    // Close modals on outside click
+    window.addEventListener('click', (e) => {
+        if (e.target === templateModal && templateModal) {
+            closeTemplateModalFunc();
+        }
+        if (e.target === routineModal && routineModal) {
+            closeRoutineModalFunc();
+        }
+    });
 }
 
 // Clear all filters
@@ -377,12 +464,19 @@ function navigateTo(pageName) {
         renderHistory();
     } else if (pageName === 'dashboard') {
         updateDashboard();
+        setTimeout(() => updateDashboardCharts(), 200);
+    } else if (pageName === 'templates') {
+        renderTemplates();
+        updateTemplateSelect();
+    } else if (pageName === 'routines') {
+        renderRoutines();
     } else if (pageName === 'log') {
         // Set date to today when navigating to log page (only if not editing)
         setTimeout(() => {
             if (workoutDateInput && !window.editingWorkoutId) {
                 workoutDateInput.value = formatDateForInput(new Date());
             }
+            updateTemplateSelect();
         }, 50);
     }
 }
@@ -1102,17 +1196,20 @@ async function loadWorkouts() {
 
 // Dashboard
 function updateDashboard() {
-    document.getElementById('total-workouts').textContent = workouts.length;
+    const totalWorkoutsEl = document.getElementById('total-workouts');
+    if (totalWorkoutsEl) totalWorkoutsEl.textContent = workouts.length;
     
     const weekAgo = new Date();
     weekAgo.setDate(weekAgo.getDate() - 7);
     const weekWorkouts = workouts.filter(w => w.timestamp >= weekAgo).length;
-    document.getElementById('week-workouts').textContent = weekWorkouts;
+    const weekWorkoutsEl = document.getElementById('week-workouts');
+    if (weekWorkoutsEl) weekWorkoutsEl.textContent = weekWorkouts;
 
     const totalVolume = workouts.reduce((sum, workout) => {
         return sum + (workout.totalVolume || 0);
     }, 0);
-    document.getElementById('total-volume').textContent = totalVolume.toLocaleString();
+    const totalVolumeEl = document.getElementById('total-volume');
+    if (totalVolumeEl) totalVolumeEl.textContent = totalVolume.toLocaleString();
 
     const exerciseCounts = {};
     workouts.forEach(workout => {
@@ -1126,7 +1223,43 @@ function updateDashboard() {
     const favoriteExercise = Object.keys(exerciseCounts).reduce((a, b) => 
         exerciseCounts[a] > exerciseCounts[b] ? a : b, 'None'
     );
-    document.getElementById('favorite-exercise').textContent = favoriteExercise;
+    const favoriteExerciseEl = document.getElementById('favorite-exercise');
+    if (favoriteExerciseEl) favoriteExerciseEl.textContent = favoriteExercise;
+    
+    // This Month
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+    const monthWorkouts = workouts.filter(w => w.timestamp >= monthStart).length;
+    const monthEl = document.getElementById('month-workouts');
+    if (monthEl) monthEl.textContent = monthWorkouts;
+    
+    // Avg per Week
+    if (workouts.length > 0) {
+        const firstWorkout = workouts[workouts.length - 1].timestamp;
+        const weeksDiff = (new Date() - firstWorkout) / (1000 * 60 * 60 * 24 * 7);
+        const avgWeek = weeksDiff > 0 ? (workouts.length / weeksDiff).toFixed(1) : workouts.length;
+        const avgWeekEl = document.getElementById('avg-week-workouts');
+        if (avgWeekEl) avgWeekEl.textContent = avgWeek;
+    }
+    
+    // Total Exercises
+    const uniqueExercises = new Set();
+    workouts.forEach(w => {
+        w.exercises?.forEach(ex => uniqueExercises.add(ex.name));
+    });
+    const totalExercisesEl = document.getElementById('total-exercises');
+    if (totalExercisesEl) totalExercisesEl.textContent = uniqueExercises.size;
+    
+    // Consistency Score (workouts per week average, capped at 7)
+    if (workouts.length > 0) {
+        const firstWorkout = workouts[workouts.length - 1].timestamp;
+        const weeksDiff = Math.max(1, (new Date() - firstWorkout) / (1000 * 60 * 60 * 24 * 7));
+        const workoutsPerWeek = workouts.length / weeksDiff;
+        const consistencyScore = Math.min(7, Math.round(workoutsPerWeek));
+        const consistencyEl = document.getElementById('consistency-score');
+        if (consistencyEl) consistencyEl.textContent = `${consistencyScore}/7`;
+    }
 }
 
 // Progress Chart
@@ -1528,9 +1661,650 @@ function renderHistory() {
     });
 }
 
+// ========== TEMPLATE FUNCTIONS ==========
+let templateExerciseCounter = 0;
+let editingTemplateId = null;
+
+function openTemplateModal(templateId = null) {
+    editingTemplateId = templateId;
+    templateExerciseCounter = 0;
+    if (templateNameInput) templateNameInput.value = '';
+    if (templateExercisesList) templateExercisesList.innerHTML = '';
+    if (templateModal) {
+        const modalTitle = document.getElementById('template-modal-title');
+        if (modalTitle) modalTitle.textContent = templateId ? 'Edit Template' : 'Create Template';
+        templateModal.classList.remove('hidden');
+    }
+    
+    const template = templates.find(t => t.id === templateId);
+    if (template) {
+        if (templateNameInput) templateNameInput.value = template.name || '';
+        if (template.exercises) {
+            template.exercises.forEach(ex => {
+                addTemplateExerciseRow(ex);
+            });
+        }
+    }
+}
+
+function closeTemplateModalFunc() {
+    if (templateModal) templateModal.classList.add('hidden');
+    editingTemplateId = null;
+    templateExerciseCounter = 0;
+    if (templateNameInput) templateNameInput.value = '';
+    if (templateExercisesList) templateExercisesList.innerHTML = '';
+}
+
+function addTemplateExerciseRow(exerciseData = null) {
+    templateExerciseCounter++;
+    const exerciseItem = document.createElement('div');
+    exerciseItem.className = 'exercise-item';
+    exerciseItem.id = `template-exercise-${templateExerciseCounter}`;
+    
+    exerciseItem.innerHTML = `
+        <div class="exercise-item-header">
+            <h4>Exercise ${templateExerciseCounter}</h4>
+            <button class="remove-exercise-btn" onclick="removeTemplateExercise(${templateExerciseCounter})">Remove</button>
+        </div>
+        <div class="exercise-fields">
+            <div class="exercise-name-wrapper">
+                <label>Exercise Name</label>
+                <input type="text" class="exercise-name" placeholder="e.g., Bench Press" value="${exerciseData?.name || ''}" required autocomplete="off">
+                <div class="autocomplete-suggestions" id="template-autocomplete-${templateExerciseCounter}"></div>
+            </div>
+            <div>
+                <label>Sets</label>
+                <input type="number" class="exercise-sets" placeholder="" value="${exerciseData?.sets || ''}" min="1" required>
+            </div>
+            <div>
+                <label>Reps</label>
+                <input type="number" class="exercise-reps" placeholder="" value="${exerciseData?.reps || ''}" min="1" required>
+            </div>
+            <div>
+                <label>Weight (lbs)</label>
+                <input type="number" class="exercise-weight" placeholder="" value="${exerciseData?.weight || ''}" min="0" step="2.5">
+            </div>
+        </div>
+    `;
+    
+    if (templateExercisesList) {
+        templateExercisesList.appendChild(exerciseItem);
+        const exerciseNameInput = exerciseItem.querySelector('.exercise-name');
+        setupAutocomplete(exerciseNameInput, `template-autocomplete-${templateExerciseCounter}`);
+    }
+}
+
+window.removeTemplateExercise = function(id) {
+    const exerciseItem = document.getElementById(`template-exercise-${id}`);
+    if (exerciseItem) exerciseItem.remove();
+};
+
+async function saveTemplate() {
+    if (!db || !currentUser) {
+        showToast('Please login to save templates', 'warning');
+        return;
+    }
+    
+    const name = templateNameInput ? templateNameInput.value.trim() : '';
+    if (!name) {
+        showToast('Please enter a template name', 'warning');
+        return;
+    }
+    
+    const exerciseItems = templateExercisesList ? templateExercisesList.querySelectorAll('.exercise-item') : [];
+    if (exerciseItems.length === 0) {
+        showToast('Please add at least one exercise', 'warning');
+        return;
+    }
+    
+    const exercises = [];
+    exerciseItems.forEach(item => {
+        const name = item.querySelector('.exercise-name').value.trim();
+        const sets = parseInt(item.querySelector('.exercise-sets').value);
+        const reps = parseInt(item.querySelector('.exercise-reps').value);
+        const weight = parseFloat(item.querySelector('.exercise-weight').value) || null;
+        
+        if (name && sets && reps) {
+            exercises.push({ name, sets, reps, weight: weight > 0 ? weight : null });
+        }
+    });
+    
+    if (exercises.length === 0) {
+        showToast('Please fill in all required fields for at least one exercise', 'warning');
+        return;
+    }
+    
+    try {
+        showLoading('Saving template...');
+        const templateData = {
+            name,
+            exercises,
+            userId: currentUser.uid
+        };
+        
+        if (editingTemplateId) {
+            await updateDoc(doc(db, 'templates', editingTemplateId), templateData);
+            showToast('Template updated successfully!', 'success');
+        } else {
+            await addDoc(collection(db, 'templates'), templateData);
+            showToast('Template saved successfully!', 'success');
+        }
+        
+        await loadTemplates();
+        closeTemplateModalFunc();
+        renderTemplates();
+        hideLoading();
+    } catch (error) {
+        console.error('Error saving template:', error);
+        hideLoading();
+        showToast('Error saving template. Please try again.', 'error');
+    }
+}
+
+async function loadTemplates() {
+    if (!db || !currentUser) {
+        templates = [];
+        return;
+    }
+    
+    try {
+        const templatesQuery = query(
+            collection(db, 'templates'),
+            where('userId', '==', currentUser.uid),
+            orderBy('name', 'asc')
+        );
+        const snapshot = await getDocs(templatesQuery);
+        templates = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+        updateTemplateSelect();
+    } catch (error) {
+        console.error('Error loading templates:', error);
+        templates = [];
+    }
+}
+
+function updateTemplateSelect() {
+    if (!loadTemplateSelect) return;
+    
+    loadTemplateSelect.innerHTML = '<option value="">Select a template...</option>';
+    templates.forEach(template => {
+        const option = document.createElement('option');
+        option.value = template.id;
+        option.textContent = template.name;
+        loadTemplateSelect.appendChild(option);
+    });
+}
+
+function loadTemplateIntoWorkout() {
+    const templateId = loadTemplateSelect ? loadTemplateSelect.value : '';
+    if (!templateId) {
+        showToast('Please select a template', 'warning');
+        return;
+    }
+    
+    const template = templates.find(t => t.id === templateId);
+    if (!template) {
+        showToast('Template not found', 'error');
+        return;
+    }
+    
+    // Clear existing exercises
+    if (exercisesList) exercisesList.innerHTML = '';
+    exerciseCounter = 0;
+    
+    // Navigate to log page if not already there
+    navigateTo('log');
+    
+    // Add exercises from template
+    template.exercises.forEach(ex => {
+        addExerciseRow();
+        const exerciseItems = exercisesList.querySelectorAll('.exercise-item');
+        const lastItem = exerciseItems[exerciseItems.length - 1];
+        if (lastItem) {
+            const nameInput = lastItem.querySelector('.exercise-name');
+            const setsInput = lastItem.querySelector('.exercise-sets');
+            const repsInput = lastItem.querySelector('.exercise-reps');
+            const weightInput = lastItem.querySelector('.exercise-weight');
+            
+            if (nameInput) nameInput.value = ex.name || '';
+            if (setsInput) setsInput.value = ex.sets || '';
+            if (repsInput) repsInput.value = ex.reps || '';
+            if (weightInput && ex.weight) weightInput.value = ex.weight;
+        }
+    });
+    
+    showToast('Template loaded successfully!', 'success');
+}
+
+function renderTemplates() {
+    if (!templatesList) return;
+    
+    templatesList.innerHTML = '';
+    
+    if (templates.length === 0) {
+        templatesList.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">No templates yet. Create one to get started!</p>';
+        return;
+    }
+    
+    templates.forEach(template => {
+        const item = document.createElement('div');
+        item.className = 'template-item';
+        item.innerHTML = `
+            <div class="template-header">
+                <h3>${template.name}</h3>
+                <div class="template-actions">
+                    <button class="btn-icon" onclick="useTemplate('${template.id}')" title="Use Template">📋</button>
+                    <button class="btn-icon edit-btn" onclick="editTemplate('${template.id}')" title="Edit">✏️</button>
+                    <button class="btn-icon delete-btn" onclick="deleteTemplate('${template.id}')" title="Delete">🗑️</button>
+                </div>
+            </div>
+            <div class="template-exercises">
+                ${template.exercises?.map(ex => `
+                    <div class="template-exercise-tag">
+                        ${ex.name} - ${ex.sets}×${ex.reps}${ex.weight ? ` @ ${ex.weight}lbs` : ''}
+                    </div>
+                `).join('') || ''}
+            </div>
+        `;
+        templatesList.appendChild(item);
+    });
+}
+
+window.useTemplate = function(templateId) {
+    loadTemplateSelect.value = templateId;
+    loadTemplateIntoWorkout();
+};
+
+window.editTemplate = function(templateId) {
+    openTemplateModal(templateId);
+};
+
+window.deleteTemplate = async function(templateId) {
+    if (!db || !currentUser) return;
+    if (!confirm('Are you sure you want to delete this template?')) return;
+    
+    try {
+        showLoading('Deleting template...');
+        await deleteDoc(doc(db, 'templates', templateId));
+        await loadTemplates();
+        renderTemplates();
+        hideLoading();
+        showToast('Template deleted successfully!', 'success');
+    } catch (error) {
+        console.error('Error deleting template:', error);
+        hideLoading();
+        showToast('Error deleting template. Please try again.', 'error');
+    }
+};
+
+// ========== ROUTINE FUNCTIONS ==========
+let routineDayCounter = 0;
+let editingRoutineId = null;
+const dayNames = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+
+function openRoutineModal(routineId = null) {
+    editingRoutineId = routineId;
+    routineDayCounter = 0;
+    if (routineNameInput) routineNameInput.value = '';
+    if (routineDescriptionInput) routineDescriptionInput.value = '';
+    if (routineDaysList) routineDaysList.innerHTML = '';
+    if (routineModal) {
+        const modalTitle = document.getElementById('routine-modal-title');
+        if (modalTitle) modalTitle.textContent = routineId ? 'Edit Routine' : 'Create Routine';
+        routineModal.classList.remove('hidden');
+    }
+    
+    const routine = routines.find(r => r.id === routineId);
+    if (routine) {
+        if (routineNameInput) routineNameInput.value = routine.name || '';
+        if (routineDescriptionInput) routineDescriptionInput.value = routine.description || '';
+        if (routine.schedule) {
+            routine.schedule.forEach(day => {
+                addRoutineDay(day);
+            });
+        }
+    }
+}
+
+function closeRoutineModalFunc() {
+    if (routineModal) routineModal.classList.add('hidden');
+    editingRoutineId = null;
+    routineDayCounter = 0;
+    if (routineNameInput) routineNameInput.value = '';
+    if (routineDescriptionInput) routineDescriptionInput.value = '';
+    if (routineDaysList) routineDaysList.innerHTML = '';
+}
+
+function addRoutineDay(dayData = null) {
+    routineDayCounter++;
+    const dayItem = document.createElement('div');
+    dayItem.className = 'routine-day-item';
+    dayItem.id = `routine-day-${routineDayCounter}`;
+    
+    dayItem.innerHTML = `
+        <div class="routine-day-header">
+            <select class="routine-day-select">
+                ${dayNames.map((day, idx) => `<option value="${day}" ${(dayData?.day === day || (!dayData && idx === routineDayCounter - 1)) ? 'selected' : ''}>${day}</option>`).join('')}
+            </select>
+            <select class="routine-template-select">
+                <option value="">No workout</option>
+                ${templates.map(t => `<option value="${t.id}" ${dayData?.templateId === t.id ? 'selected' : ''}>${t.name}</option>`).join('')}
+            </select>
+            <button class="remove-exercise-btn" onclick="removeRoutineDay(${routineDayCounter})">Remove</button>
+        </div>
+    `;
+    
+    if (routineDaysList) routineDaysList.appendChild(dayItem);
+}
+
+window.removeRoutineDay = function(id) {
+    const dayItem = document.getElementById(`routine-day-${id}`);
+    if (dayItem) dayItem.remove();
+};
+
+async function saveRoutine() {
+    if (!db || !currentUser) {
+        showToast('Please login to save routines', 'warning');
+        return;
+    }
+    
+    const name = routineNameInput ? routineNameInput.value.trim() : '';
+    if (!name) {
+        showToast('Please enter a routine name', 'warning');
+        return;
+    }
+    
+    const dayItems = routineDaysList ? routineDaysList.querySelectorAll('.routine-day-item') : [];
+    const schedule = [];
+    dayItems.forEach(item => {
+        const day = item.querySelector('.routine-day-select').value;
+        const templateId = item.querySelector('.routine-template-select').value;
+        if (day && templateId) {
+            schedule.push({ day, templateId });
+        }
+    });
+    
+    try {
+        showLoading('Saving routine...');
+        const routineData = {
+            name,
+            description: routineDescriptionInput ? routineDescriptionInput.value.trim() : '',
+            schedule,
+            userId: currentUser.uid
+        };
+        
+        if (editingRoutineId) {
+            await updateDoc(doc(db, 'routines', editingRoutineId), routineData);
+            showToast('Routine updated successfully!', 'success');
+        } else {
+            await addDoc(collection(db, 'routines'), routineData);
+            showToast('Routine saved successfully!', 'success');
+        }
+        
+        await loadRoutines();
+        closeRoutineModalFunc();
+        renderRoutines();
+        hideLoading();
+    } catch (error) {
+        console.error('Error saving routine:', error);
+        hideLoading();
+        showToast('Error saving routine. Please try again.', 'error');
+    }
+}
+
+async function loadRoutines() {
+    if (!db || !currentUser) {
+        routines = [];
+        return;
+    }
+    
+    try {
+        const routinesQuery = query(
+            collection(db, 'routines'),
+            where('userId', '==', currentUser.uid),
+            orderBy('name', 'asc')
+        );
+        const snapshot = await getDocs(routinesQuery);
+        routines = snapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+        }));
+    } catch (error) {
+        console.error('Error loading routines:', error);
+        routines = [];
+    }
+}
+
+function renderRoutines() {
+    if (!routinesList) return;
+    
+    routinesList.innerHTML = '';
+    
+    if (routines.length === 0) {
+        routinesList.innerHTML = '<p style="text-align: center; color: var(--text-muted); padding: 2rem;">No routines yet. Create one to get started!</p>';
+        return;
+    }
+    
+    routines.forEach(routine => {
+        const item = document.createElement('div');
+        item.className = 'routine-item';
+        item.innerHTML = `
+            <div class="routine-header">
+                <div>
+                    <h3>${routine.name}</h3>
+                    ${routine.description ? `<p style="color: var(--text-secondary); margin-top: 0.5rem;">${routine.description}</p>` : ''}
+                </div>
+                <div class="routine-actions">
+                    <button class="btn-icon edit-btn" onclick="editRoutine('${routine.id}')" title="Edit">✏️</button>
+                    <button class="btn-icon delete-btn" onclick="deleteRoutine('${routine.id}')" title="Delete">🗑️</button>
+                </div>
+            </div>
+            <div class="routine-schedule">
+                ${routine.schedule?.map(day => {
+                    const template = templates.find(t => t.id === day.templateId);
+                    return `<div class="routine-schedule-day"><strong>${day.day}:</strong> ${template ? template.name : 'No workout'}</div>`;
+                }).join('') || '<p style="color: var(--text-muted);">No schedule set</p>'}
+            </div>
+        `;
+        routinesList.appendChild(item);
+    });
+}
+
+window.editRoutine = function(routineId) {
+    openRoutineModal(routineId);
+};
+
+window.deleteRoutine = async function(routineId) {
+    if (!db || !currentUser) return;
+    if (!confirm('Are you sure you want to delete this routine?')) return;
+    
+    try {
+        showLoading('Deleting routine...');
+        await deleteDoc(doc(db, 'routines', routineId));
+        await loadRoutines();
+        renderRoutines();
+        hideLoading();
+        showToast('Routine deleted successfully!', 'success');
+    } catch (error) {
+        console.error('Error deleting routine:', error);
+        hideLoading();
+        showToast('Error deleting routine. Please try again.', 'error');
+    }
+};
+
+// ========== ENHANCED DASHBOARD ==========
+function updateDashboardCharts() {
+    updateMonthlyChart();
+    updateVolumeChart();
+}
+
+function updateMonthlyChart() {
+    const ctx = document.getElementById('monthly-chart');
+    if (!ctx) return;
+    
+    if (monthlyChart) monthlyChart.destroy();
+    
+    const monthlyData = {};
+    workouts.forEach(workout => {
+        const monthKey = workout.timestamp.toISOString().substring(0, 7); // YYYY-MM
+        monthlyData[monthKey] = (monthlyData[monthKey] || 0) + 1;
+    });
+    
+    const sortedMonths = Object.keys(monthlyData).sort();
+    const labels = sortedMonths.map(m => {
+        const date = new Date(m + '-01');
+        return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+    });
+    const data = sortedMonths.map(m => monthlyData[m]);
+    
+    monthlyChart = new Chart(ctx, {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Workouts',
+                data,
+                backgroundColor: 'rgba(99, 102, 241, 0.6)',
+                borderColor: 'rgb(99, 102, 241)',
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: '#cbd5e1' },
+                    grid: { color: '#334155' }
+                },
+                x: {
+                    ticks: { color: '#cbd5e1' },
+                    grid: { color: '#334155' }
+                }
+            },
+            plugins: {
+                legend: { labels: { color: '#f1f5f9' } }
+            }
+        }
+    });
+}
+
+function updateVolumeChart() {
+    const ctx = document.getElementById('volume-chart');
+    if (!ctx) return;
+    
+    if (volumeChart) volumeChart.destroy();
+    
+    const weeklyData = {};
+    workouts.forEach(workout => {
+        const weekStart = new Date(workout.timestamp);
+        weekStart.setDate(weekStart.getDate() - weekStart.getDay());
+        const weekKey = weekStart.toISOString().substring(0, 10);
+        weeklyData[weekKey] = (weeklyData[weekKey] || 0) + (workout.totalVolume || 0);
+    });
+    
+    const sortedWeeks = Object.keys(weeklyData).sort().slice(-12); // Last 12 weeks
+    const labels = sortedWeeks.map(w => {
+        const date = new Date(w);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    });
+    const data = sortedWeeks.map(w => weeklyData[w]);
+    
+    volumeChart = new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Volume (lbs)',
+                data,
+                borderColor: 'rgb(139, 92, 246)',
+                backgroundColor: 'rgba(139, 92, 246, 0.1)',
+                tension: 0.4,
+                fill: true
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { color: '#cbd5e1' },
+                    grid: { color: '#334155' }
+                },
+                x: {
+                    ticks: { color: '#cbd5e1' },
+                    grid: { color: '#334155' }
+                }
+            },
+            plugins: {
+                legend: { labels: { color: '#f1f5f9' } }
+            }
+        }
+    });
+}
+
+// ========== EXPORT FUNCTIONALITY ==========
+function exportData() {
+    const data = {
+        workouts: workouts.map(w => ({
+            type: w.type,
+            timestamp: w.timestamp.toISOString(),
+            exercises: w.exercises,
+            totalVolume: w.totalVolume,
+            notes: w.notes
+        })),
+        templates: templates.map(t => ({
+            name: t.name,
+            exercises: t.exercises
+        })),
+        routines: routines.map(r => ({
+            name: r.name,
+            description: r.description,
+            schedule: r.schedule
+        })),
+        exportDate: new Date().toISOString()
+    };
+    
+    // Export as JSON
+    const jsonData = JSON.stringify(data, null, 2);
+    const jsonBlob = new Blob([jsonData], { type: 'application/json' });
+    const jsonUrl = URL.createObjectURL(jsonBlob);
+    const jsonLink = document.createElement('a');
+    jsonLink.href = jsonUrl;
+    jsonLink.download = `workout-data-${new Date().toISOString().split('T')[0]}.json`;
+    jsonLink.click();
+    URL.revokeObjectURL(jsonUrl);
+    
+    // Export as CSV (workouts only)
+    const csvRows = [];
+    csvRows.push('Date,Type,Exercise,Sets,Reps,Weight,Volume,Notes');
+    workouts.forEach(workout => {
+        workout.exercises?.forEach(ex => {
+            const date = workout.timestamp.toISOString().split('T')[0];
+            const volume = (ex.sets || 1) * (typeof ex.reps === 'number' ? ex.reps : parseInt(ex.reps) || 1) * (ex.weight || 0);
+            csvRows.push(`"${date}","${workout.type || ''}","${ex.name}","${ex.sets}","${ex.reps}","${ex.weight || ''}","${volume}","${(workout.notes || '').replace(/"/g, '""')}"`);
+        });
+    });
+    const csvData = csvRows.join('\n');
+    const csvBlob = new Blob([csvData], { type: 'text/csv' });
+    const csvUrl = URL.createObjectURL(csvBlob);
+    const csvLink = document.createElement('a');
+    csvLink.href = csvUrl;
+    csvLink.download = `workout-data-${new Date().toISOString().split('T')[0]}.csv`;
+    csvLink.click();
+    URL.revokeObjectURL(csvUrl);
+    
+    showToast('Data exported successfully!', 'success');
+}
+
 // Initialize dashboard on load
 setTimeout(() => {
     if (document.getElementById('dashboard-page').classList.contains('active')) {
         updateDashboard();
+        updateDashboardCharts();
     }
 }, 500);
