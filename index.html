@@ -179,11 +179,25 @@
             <div class="container">
                 <h2>Workout History</h2>
                 <div class="history-controls">
-                    <input type="text" id="history-search" placeholder="Search workouts...">
+                    <input type="text" id="history-search" placeholder="Search workouts, exercises, notes...">
                     <select id="history-sort">
                         <option value="newest">Newest First</option>
                         <option value="oldest">Oldest First</option>
                     </select>
+                </div>
+                <div class="history-filters">
+                    <div class="filter-group">
+                        <label>Date Range:</label>
+                        <input type="date" id="filter-date-from" placeholder="From">
+                        <input type="date" id="filter-date-to" placeholder="To">
+                    </div>
+                    <div class="filter-group">
+                        <label>Exercise:</label>
+                        <select id="filter-exercise">
+                            <option value="">All Exercises</option>
+                        </select>
+                    </div>
+                    <button id="clear-filters-btn" class="btn btn-secondary">Clear Filters</button>
                 </div>
                 <div id="history-list" class="history-list"></div>
             </div>

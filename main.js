@@ -39,7 +39,51 @@ let progressChart = null;
 let pages, navBtns, authBtn, authModal, closeModal, loginForm, signupForm, showSignup, showLogin;
 let loginBtn, signupBtn, authError, generateWodBtn, wodResult, wodContent, saveWodBtn;
 let exerciseSelect, metricSelect, historyList, historySearch, historySort;
+let filterDateFrom, filterDateTo, filterExercise, clearFiltersBtn;
 let addExerciseBtn, exercisesList, saveWorkoutBtn, clearWorkoutBtn, cancelEditBtn, workoutNameInput, workoutDateInput, workoutNotesInput;
+
+// Exercise Library - Comprehensive list for autocomplete
+const exerciseLibrary = [
+    // Upper Body - Push
+    'Bench Press', 'Incline Bench Press', 'Decline Bench Press', 'Dumbbell Press', 'Dumbbell Flyes',
+    'Push-ups', 'Diamond Push-ups', 'Wide Push-ups', 'Incline Push-ups', 'Decline Push-ups',
+    'Overhead Press', 'Shoulder Press', 'Dumbbell Shoulder Press', 'Arnold Press', 'Lateral Raises',
+    'Front Raises', 'Tricep Dips', 'Tricep Extensions', 'Close Grip Bench Press', 'Skull Crushers',
+    'Pike Push-ups', 'Handstand Push-ups',
+    
+    // Upper Body - Pull
+    'Pull-ups', 'Chin-ups', 'Lat Pulldown', 'Barbell Rows', 'Dumbbell Rows', 'Cable Rows',
+    'T-Bar Rows', 'Seated Rows', 'Face Pulls', 'Bicep Curls', 'Hammer Curls', 'Preacher Curls',
+    'Cable Curls', 'Concentration Curls', 'Reverse Curls',
+    
+    // Lower Body
+    'Back Squat', 'Front Squat', 'Barbell Back Squat', 'Barbell Front Squat', 'Goblet Squat',
+    'Dumbbell Squats', 'Bulgarian Split Squats', 'Lunges', 'Dumbbell Lunges', 'Reverse Lunges',
+    'Walking Lunges', 'Leg Press', 'Leg Curls', 'Leg Extensions', 'Romanian Deadlift',
+    'Stiff Leg Deadlift', 'Good Mornings', 'Calf Raises', 'Seated Calf Raises', 'Pistol Squats',
+    
+    // Deadlifts
+    'Deadlift', 'Barbell Deadlift', 'Sumo Deadlift', 'Conventional Deadlift', 'Trap Bar Deadlift',
+    'Romanian Deadlift', 'Stiff Leg Deadlift',
+    
+    // Olympic Lifts
+    'Clean', 'Clean & Jerk', 'Barbell Clean & Jerk', 'Power Clean', 'Hang Clean',
+    'Snatch', 'Barbell Snatch', 'Power Snatch', 'Hang Snatch', 'Thruster', 'Barbell Thruster',
+    'Dumbbell Snatches', 'Dumbbell Thrusters',
+    
+    // Core
+    'Sit-ups', 'Crunches', 'Plank', 'Plank Hold', 'Side Plank', 'Russian Twists', 'Leg Raises',
+    'Hanging Leg Raises', 'Mountain Climbers', 'Bicycle Crunches', 'Ab Wheel', 'Dead Bug',
+    'Turkish Get-ups', 'Dumbbell Turkish Get-ups',
+    
+    // Cardio/Bodyweight
+    'Burpees', 'Jumping Jacks', 'High Knees', 'Mountain Climbers', 'Jump Squats', 'Box Jumps',
+    'Burpee Box Jumps', 'Jump Rope', 'Running', 'Cycling', 'Rowing',
+    
+    // Accessory
+    'Shrugs', 'Farmer\'s Walk', 'Kettlebell Swings', 'Battle Ropes', 'Medicine Ball Slams',
+    'Wall Balls', 'Rope Climbs', 'Muscle-ups', 'Toes to Bar', 'Knee to Elbow'
+];
 
 // WOD Exercises Database
 const wodExercises = {
@@ -177,6 +221,10 @@ function initWorkoutTracker() {
     historyList = document.getElementById('history-list');
     historySearch = document.getElementById('history-search');
     historySort = document.getElementById('history-sort');
+    filterDateFrom = document.getElementById('filter-date-from');
+    filterDateTo = document.getElementById('filter-date-to');
+    filterExercise = document.getElementById('filter-exercise');
+    clearFiltersBtn = document.getElementById('clear-filters-btn');
     addExerciseBtn = document.getElementById('add-exercise-btn');
     exercisesList = document.getElementById('exercises-list');
     saveWorkoutBtn = document.getElementById('save-workout-btn');
@@ -288,6 +336,27 @@ function setupEventListeners() {
     if (historySort) {
         historySort.addEventListener('change', renderHistory);
     }
+    if (filterDateFrom) {
+        filterDateFrom.addEventListener('change', renderHistory);
+    }
+    if (filterDateTo) {
+        filterDateTo.addEventListener('change', renderHistory);
+    }
+    if (filterExercise) {
+        filterExercise.addEventListener('change', renderHistory);
+    }
+    if (clearFiltersBtn) {
+        clearFiltersBtn.addEventListener('click', clearFilters);
+    }
+}
+
+// Clear all filters
+function clearFilters() {
+    if (historySearch) historySearch.value = '';
+    if (filterDateFrom) filterDateFrom.value = '';
+    if (filterDateTo) filterDateTo.value = '';
+    if (filterExercise) filterExercise.value = '';
+    renderHistory();
 }
 
 // Navigation
@@ -479,9 +548,10 @@ function addExerciseRow() {
             <button class="remove-exercise-btn" onclick="removeExercise(${exerciseCounter})">Remove</button>
         </div>
         <div class="exercise-fields">
-            <div>
+            <div class="exercise-name-wrapper">
                 <label>Exercise Name</label>
-                <input type="text" class="exercise-name" placeholder="e.g., Bench Press" required>
+                <input type="text" class="exercise-name" placeholder="e.g., Bench Press" required autocomplete="off">
+                <div class="autocomplete-suggestions" id="autocomplete-${exerciseCounter}"></div>
             </div>
             <div>
                 <label>Sets</label>
@@ -499,12 +569,98 @@ function addExerciseRow() {
     `;
     
     exercisesList.appendChild(exerciseItem);
+    
+    // Add autocomplete to the new exercise name input
+    const exerciseNameInput = exerciseItem.querySelector('.exercise-name');
+    setupAutocomplete(exerciseNameInput, `autocomplete-${exerciseCounter}`);
 }
 
 function removeExercise(id) {
     const exerciseItem = document.getElementById(`exercise-${id}`);
     if (exerciseItem) {
         exerciseItem.remove();
+    }
+}
+
+// Autocomplete functionality for exercise names
+function setupAutocomplete(input, suggestionsId) {
+    const suggestionsDiv = document.getElementById(suggestionsId);
+    if (!input || !suggestionsDiv) return;
+    
+    let selectedIndex = -1;
+    let filteredExercises = [];
+    
+    input.addEventListener('input', (e) => {
+        const value = e.target.value.toLowerCase().trim();
+        if (value.length === 0) {
+            suggestionsDiv.innerHTML = '';
+            suggestionsDiv.classList.remove('show');
+            return;
+        }
+        
+        filteredExercises = exerciseLibrary.filter(ex => 
+            ex.toLowerCase().includes(value)
+        ).slice(0, 8); // Show max 8 suggestions
+        
+        if (filteredExercises.length > 0) {
+            suggestionsDiv.innerHTML = filteredExercises.map((ex, index) => 
+                `<div class="autocomplete-item" data-index="${index}">${ex}</div>`
+            ).join('');
+            suggestionsDiv.classList.add('show');
+            selectedIndex = -1;
+        } else {
+            suggestionsDiv.innerHTML = '';
+            suggestionsDiv.classList.remove('show');
+        }
+    });
+    
+    input.addEventListener('keydown', (e) => {
+        if (!suggestionsDiv.classList.contains('show')) return;
+        
+        const items = suggestionsDiv.querySelectorAll('.autocomplete-item');
+        if (e.key === 'ArrowDown') {
+            e.preventDefault();
+            selectedIndex = Math.min(selectedIndex + 1, items.length - 1);
+            updateSelection(items);
+        } else if (e.key === 'ArrowUp') {
+            e.preventDefault();
+            selectedIndex = Math.max(selectedIndex - 1, -1);
+            updateSelection(items);
+        } else if (e.key === 'Enter' && selectedIndex >= 0) {
+            e.preventDefault();
+            if (items[selectedIndex]) {
+                input.value = filteredExercises[selectedIndex];
+                suggestionsDiv.innerHTML = '';
+                suggestionsDiv.classList.remove('show');
+            }
+        } else if (e.key === 'Escape') {
+            suggestionsDiv.innerHTML = '';
+            suggestionsDiv.classList.remove('show');
+        }
+    });
+    
+    suggestionsDiv.addEventListener('click', (e) => {
+        const item = e.target.closest('.autocomplete-item');
+        if (item) {
+            const index = parseInt(item.dataset.index);
+            input.value = filteredExercises[index];
+            suggestionsDiv.innerHTML = '';
+            suggestionsDiv.classList.remove('show');
+            input.focus();
+        }
+    });
+    
+    // Close suggestions when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!input.contains(e.target) && !suggestionsDiv.contains(e.target)) {
+            suggestionsDiv.classList.remove('show');
+        }
+    });
+    
+    function updateSelection(items) {
+        items.forEach((item, index) => {
+            item.classList.toggle('selected', index === selectedIndex);
+        });
     }
 }
 
@@ -771,9 +927,10 @@ async function editWorkout(workoutId) {
                     <button class="remove-exercise-btn" onclick="removeExercise(${exerciseCounter})">Remove</button>
                 </div>
                 <div class="exercise-fields">
-                    <div>
+                    <div class="exercise-name-wrapper">
                         <label>Exercise Name</label>
-                        <input type="text" class="exercise-name" placeholder="e.g., Bench Press" value="${ex.name || ''}" required>
+                        <input type="text" class="exercise-name" placeholder="e.g., Bench Press" value="${ex.name || ''}" required autocomplete="off">
+                        <div class="autocomplete-suggestions" id="autocomplete-edit-${exerciseCounter}"></div>
                     </div>
                     <div>
                         <label>Sets</label>
@@ -791,6 +948,10 @@ async function editWorkout(workoutId) {
             `;
             
             exercisesList.appendChild(exerciseItem);
+            
+            // Add autocomplete to the exercise name input
+            const exerciseNameInput = exerciseItem.querySelector('.exercise-name');
+            setupAutocomplete(exerciseNameInput, `autocomplete-edit-${exerciseCounter}`);
         });
     }
     
@@ -977,13 +1138,29 @@ function updateExerciseSelect() {
         }
     });
 
-    exerciseSelect.innerHTML = '<option value="">Select an exercise...</option>';
-    exercises.forEach(ex => {
-        const option = document.createElement('option');
-        option.value = ex;
-        option.textContent = ex;
-        exerciseSelect.appendChild(option);
-    });
+    const sortedExercises = Array.from(exercises).sort();
+    
+    // Update progress chart exercise select
+    if (exerciseSelect) {
+        exerciseSelect.innerHTML = '<option value="">Select an exercise...</option>';
+        sortedExercises.forEach(ex => {
+            const option = document.createElement('option');
+            option.value = ex;
+            option.textContent = ex;
+            exerciseSelect.appendChild(option);
+        });
+    }
+    
+    // Update filter exercise select
+    if (filterExercise) {
+        filterExercise.innerHTML = '<option value="">All Exercises</option>';
+        sortedExercises.forEach(ex => {
+            const option = document.createElement('option');
+            option.value = ex;
+            option.textContent = ex;
+            filterExercise.appendChild(option);
+        });
+    }
 
     updateProgressChart();
 }
@@ -1120,6 +1297,62 @@ function updateProgressChart() {
 // This function is now defined above - removing duplicate
 
 // History
+// Calculate Personal Records (PRs)
+function calculatePRs() {
+    const prs = {
+        maxWeight: {}, // { exerciseName: { weight, date, workoutId } }
+        maxVolume: {}, // { exerciseName: { volume, date, workoutId } }
+        maxReps: {}    // { exerciseName: { reps, date, workoutId } }
+    };
+    
+    workouts.forEach(workout => {
+        if (!workout.exercises) return;
+        
+        workout.exercises.forEach(ex => {
+            const exerciseName = ex.name;
+            const weight = ex.weight || 0;
+            const sets = ex.sets || 1;
+            const reps = typeof ex.reps === 'number' ? ex.reps : parseInt(ex.reps) || 1;
+            const volume = sets * reps * weight;
+            
+            // Max Weight PR
+            if (weight > 0) {
+                if (!prs.maxWeight[exerciseName] || weight > prs.maxWeight[exerciseName].weight) {
+                    prs.maxWeight[exerciseName] = {
+                        weight,
+                        date: workout.timestamp,
+                        workoutId: workout.id
+                    };
+                }
+            }
+            
+            // Max Volume PR
+            if (volume > 0) {
+                if (!prs.maxVolume[exerciseName] || volume > prs.maxVolume[exerciseName].volume) {
+                    prs.maxVolume[exerciseName] = {
+                        volume,
+                        date: workout.timestamp,
+                        workoutId: workout.id
+                    };
+                }
+            }
+            
+            // Max Reps PR (for single set)
+            if (reps > 0) {
+                if (!prs.maxReps[exerciseName] || reps > prs.maxReps[exerciseName].reps) {
+                    prs.maxReps[exerciseName] = {
+                        reps,
+                        date: workout.timestamp,
+                        workoutId: workout.id
+                    };
+                }
+            }
+        });
+    });
+    
+    return prs;
+}
+
 function renderHistory() {
     if (!historyList) {
         return;
@@ -1127,14 +1360,44 @@ function renderHistory() {
     
     const searchTerm = historySearch ? historySearch.value.toLowerCase() : '';
     const sortOrder = historySort ? historySort.value : 'newest';
+    const dateFrom = filterDateFrom ? filterDateFrom.value : '';
+    const dateTo = filterDateTo ? filterDateTo.value : '';
+    const exerciseFilter = filterExercise ? filterExercise.value : '';
+    
+    // Calculate PRs once
+    const prs = calculatePRs();
 
     let filteredWorkouts = workouts.filter(workout => {
-        if (!searchTerm) return true;
-        const exerciseNames = workout.exercises?.map(ex => ex.name.toLowerCase()).join(' ') || '';
-        const notes = workout.notes?.toLowerCase() || '';
-        return exerciseNames.includes(searchTerm) || 
-               workout.type?.toLowerCase().includes(searchTerm) ||
-               notes.includes(searchTerm);
+        // Search filter
+        if (searchTerm) {
+            const exerciseNames = workout.exercises?.map(ex => ex.name.toLowerCase()).join(' ') || '';
+            const notes = workout.notes?.toLowerCase() || '';
+            if (!exerciseNames.includes(searchTerm) && 
+                !workout.type?.toLowerCase().includes(searchTerm) &&
+                !notes.includes(searchTerm)) {
+                return false;
+            }
+        }
+        
+        // Date range filter
+        if (dateFrom) {
+            const fromDate = new Date(dateFrom);
+            fromDate.setHours(0, 0, 0, 0);
+            if (workout.timestamp < fromDate) return false;
+        }
+        if (dateTo) {
+            const toDate = new Date(dateTo);
+            toDate.setHours(23, 59, 59, 999);
+            if (workout.timestamp > toDate) return false;
+        }
+        
+        // Exercise filter
+        if (exerciseFilter) {
+            const hasExercise = workout.exercises?.some(ex => ex.name === exerciseFilter);
+            if (!hasExercise) return false;
+        }
+        
+        return true;
     });
 
     if (sortOrder === 'oldest') {
@@ -1200,10 +1463,34 @@ function renderHistory() {
             </div>
             <div class="workout-details hidden" id="details-${workout.id}">
                 <div class="exercises-detail-list">
-                    ${workout.exercises?.map((ex, idx) => `
-                        <div class="exercise-detail-item">
+                    ${workout.exercises?.map((ex, idx) => {
+                        const exerciseName = ex.name;
+                        const weight = ex.weight || 0;
+                        const sets = ex.sets || 1;
+                        const reps = typeof ex.reps === 'number' ? ex.reps : parseInt(ex.reps) || 1;
+                        const volume = sets * reps * weight;
+                        
+                        // Check if this is a PR
+                        const isMaxWeightPR = prs.maxWeight[exerciseName] && 
+                            prs.maxWeight[exerciseName].workoutId === workout.id &&
+                            prs.maxWeight[exerciseName].weight === weight;
+                        const isMaxVolumePR = prs.maxVolume[exerciseName] && 
+                            prs.maxVolume[exerciseName].workoutId === workout.id &&
+                            prs.maxVolume[exerciseName].volume === volume;
+                        const isMaxRepsPR = prs.maxReps[exerciseName] && 
+                            prs.maxReps[exerciseName].workoutId === workout.id &&
+                            prs.maxReps[exerciseName].reps === reps;
+                        
+                        const prBadges = [];
+                        if (isMaxWeightPR) prBadges.push('<span class="pr-badge" title="Personal Record: Max Weight">🏆 Max Weight PR</span>');
+                        if (isMaxVolumePR) prBadges.push('<span class="pr-badge" title="Personal Record: Max Volume">🏆 Max Volume PR</span>');
+                        if (isMaxRepsPR) prBadges.push('<span class="pr-badge" title="Personal Record: Max Reps">🏆 Max Reps PR</span>');
+                        
+                        return `
+                        <div class="exercise-detail-item ${isMaxWeightPR || isMaxVolumePR || isMaxRepsPR ? 'pr-exercise' : ''}">
                             <div class="exercise-detail-header">
                                 <h4>${ex.name}</h4>
+                                ${prBadges.length > 0 ? `<div class="pr-badges">${prBadges.join('')}</div>` : ''}
                             </div>
                             <div class="exercise-detail-stats">
                                 <div class="detail-stat">
@@ -1215,18 +1502,19 @@ function renderHistory() {
                                     <span class="detail-value">${ex.reps}</span>
                                 </div>
                                 ${ex.weight ? `
-                                <div class="detail-stat">
+                                <div class="detail-stat ${isMaxWeightPR ? 'pr-stat' : ''}">
                                     <span class="detail-label">Weight:</span>
                                     <span class="detail-value">${ex.weight} lbs</span>
                                 </div>
                                 ` : ''}
-                                <div class="detail-stat">
+                                <div class="detail-stat ${isMaxVolumePR ? 'pr-stat' : ''}">
                                     <span class="detail-label">Volume:</span>
-                                    <span class="detail-value">${(ex.sets * (typeof ex.reps === 'number' ? ex.reps : parseInt(ex.reps)) * (ex.weight || 0)).toLocaleString()} lbs</span>
+                                    <span class="detail-value">${volume.toLocaleString()} lbs</span>
                                 </div>
                             </div>
                         </div>
-                    `).join('') || '<p>No exercises found</p>'}
+                    `;
+                    }).join('') || '<p>No exercises found</p>'}
                 </div>
                 ${workout.notes ? `
                 <div class="workout-notes">
